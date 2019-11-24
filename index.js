@@ -192,10 +192,41 @@ async function findMatches(foreBetPreds, kickOffPreds) {
   console.log(cleanMatches);
   const csv = new otcsv(cleanMatches);
   await csv.toDisk("./potentialBets.csv");
+  return cleanMatches;
 }
 
-(async () => {
+const express = require("express");
+const path = require("path");
+const app = express();
+const cors = require("cors");
+const dateTime = require("node-datetime");
+
+app.use(cors());
+app.use(express.static(path.join(__dirname, "build")));
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "client/build", "index.html"));
+});
+app.listen(8080);
+
+async function main() {
   const foreBetPreds = await foreBet();
   const kickOffPreds = await kickOff();
-  await findMatches(foreBetPreds, kickOffPreds);
-})();
+
+  app.get("/bets", async (req, res) => {
+    return res.send(await findMatches(foreBetPreds, kickOffPreds));
+  });
+
+  const lastupdate = {
+    lastupdate: dateTime.create().format("Y-m-d H:M:S")
+  };
+
+  app.get("/lastupdate", async (req, res) => {
+    return res.send(lastupdate);
+  });
+}
+
+main();
+
+setInterval(async () => {
+  main();
+}, 43200000);
