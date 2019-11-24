@@ -9,9 +9,11 @@ function App() {
   useEffect(() => {
     (async function() {
       let resData = null;
-      resData = await (await fetch("http://localhost:8080/bets")).json();
+      // const url = "http://localhost:5050";
+      const url = "http://angu.okasi.me";
+      resData = await (await fetch(`${url}/bets`)).json();
       setBets(resData);
-      resData = await (await fetch("http://localhost:8080/lastupdate")).json();
+      resData = await (await fetch(`${url}/lastupdate`)).json();
       setLastUpdate(Object.values(resData)[0]);
     })();
   }, []);

@@ -6,7 +6,8 @@ const _ = require("lodash");
 async function foreBet() {
   try {
     const browser = await puppeteer.launch({
-      headless: true
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
     const page = await browser.newPage();
     const url = "https://www.forebet.com/en/value-bets";
@@ -86,7 +87,8 @@ async function foreBet() {
 async function kickOff() {
   try {
     const browser = await puppeteer.launch({
-      headless: true
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
     const page = await browser.newPage();
     const url = "https://kickoff.ai/matches";
@@ -202,11 +204,11 @@ const cors = require("cors");
 const dateTime = require("node-datetime");
 
 app.use(cors());
-app.use(express.static(path.join(__dirname, "build")));
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "client/build", "index.html"));
-});
-app.listen(8080);
+app.use(express.static(path.join(__dirname, "/client/build")));
+// app.get("/", (req, res) => {
+//   res.sendFile(path.join(__dirname, "/client/build", "index.html"));
+// });
+app.listen(5050);
 
 async function main() {
   const foreBetPreds = await foreBet();
