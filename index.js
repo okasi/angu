@@ -1,27 +1,30 @@
 const puppeteer = require("puppeteer");
-const otcsv = require("objects-to-csv");
 const cheerio = require("cheerio");
+const otcsv = require("objects-to-csv");
 const _ = require("lodash");
-async function run() {
+
+async function foreBet() {
   try {
     const browser = await puppeteer.launch({
       headless: true
     });
     const page = await browser.newPage();
-    await page.goto("https://www.forebet.com/en/value-bets", {
+    const url = "https://www.forebet.com/en/value-bets";
+    console.log("going to: " + url);
+    await page.goto(url, {
       waitUntil: "networkidle0",
       timeout: 60000
     });
-    await page.screenshot({
-      path: "valueBets.png",
-      fullPage: true
-    });
+    console.log("☑️ " + url);
+    // await page.screenshot({
+    //   path: "valueBets.png",
+    //   fullPage: true
+    // });
     const html = await page.content();
     const $ = cheerio.load(html);
-    const valueBets = [];
-    const tableRows = $("table.schema > tbody > .tr_1,.tr_0");
-    tableRows.each(function() {
-      const data = $(this).html();
+    const predictions = [];
+    const predictionRows = $("table.schema > tbody > .tr_1,.tr_0");
+    predictionRows.each(function() {
       const homeTeam = $(this)
         .find(".homeTeam > span")
         .text();
@@ -58,10 +61,10 @@ async function run() {
         drawProbability &&
         awayTeamWinProbability
       ) {
-        valueBets.push({
+        predictions.push({
           homeTeam,
           awayTeam,
-          date: Date(date),
+          date,
           league,
           homeTeamWinProbability: Number(homeTeamWinProbability),
           drawProbability: Number(drawProbability),
@@ -69,13 +72,130 @@ async function run() {
         });
       }
     });
-    console.log(JSON.stringify(valueBets, null, 2));
-    const csv = new otcsv(valueBets);
+
+    // console.log(JSON.stringify(predictions, null, 2));
+    const csv = new otcsv(predictions);
     await csv.toDisk("./valueBets.csv");
     browser.close();
+    return predictions;
   } catch (e) {
     console.log(e);
   }
 }
 
-run();
+async function kickOff() {
+  try {
+    const browser = await puppeteer.launch({
+      headless: true
+    });
+    const page = await browser.newPage();
+    const url = "https://kickoff.ai/matches";
+    console.log("going to: " + url);
+    await page.goto(url, {
+      waitUntil: "networkidle0",
+      timeout: 60000
+    });
+    console.log("☑️ " + url);
+
+    try {
+      await page.waitForSelector(".btn.btn-secondary.btn-block.mt-5", {
+        timeout: 5000
+      });
+      await page.click(".btn.btn-secondary.btn-block.mt-5");
+      await page.waitFor(5000);
+      await page.waitForSelector(".btn.btn-secondary.btn-block.mt-5", {
+        timeout: 5000
+      });
+      await page.click(".btn.btn-secondary.btn-block.mt-5");
+      await page.waitFor(5000);
+      await page.waitForSelector(".btn.btn-secondary.btn-block.mt-5", {
+        timeout: 5000
+      });
+      await page.click(".btn.btn-secondary.btn-block.mt-5");
+    } catch {}
+
+    const html = await page.content();
+    const $ = cheerio.load(html);
+    const predictions = [];
+    const predictionRows = $(".prediction.prediction-fixture");
+    predictionRows.each(function() {
+      const homeTeam = $(this)
+        .find(".team-home > .team-name")
+        .text();
+      const awayTeam = $(this)
+        .find(".team-away > .team-name")
+        .text();
+      const homeTeamWinProbability = $(this)
+        .find(".prediction-win-home")
+        .text()
+        .replace("%", "");
+      const drawProbability = $(this)
+        .find(".prediction-draw")
+        .text()
+        .replace("%", "");
+      const awayTeamWinProbability = $(this)
+        .find(".prediction-win-away")
+        .text()
+        .replace("%", "");
+      const date = $(this)
+        .find(".match-time-list")
+        .text();
+
+      if (
+        homeTeam &&
+        awayTeam &&
+        date &&
+        homeTeamWinProbability &&
+        drawProbability &&
+        awayTeamWinProbability
+      ) {
+        predictions.push({
+          homeTeam,
+          awayTeam,
+          date,
+          homeTeamWinProbability: Number(homeTeamWinProbability),
+          drawProbability: Number(drawProbability),
+          awayTeamWinProbability: Number(awayTeamWinProbability)
+        });
+      }
+    });
+
+    // console.log(JSON.stringify(predictions, null, 2));
+    const csv = new otcsv(predictions);
+    await csv.toDisk("./kickOff.csv");
+    browser.close();
+    return predictions;
+  } catch (e) {
+    console.log(e);
+  }
+}
+
+async function findMatches(foreBetPreds, kickOffPreds) {
+  let matches = [];
+  _.forEach(kickOffPreds, kickOffValue => {
+    _.filter(
+      foreBetPreds,
+      p => _.includes(p.homeTeam, kickOffValue.homeTeam) && matches.push(p)
+    );
+  });
+  let matchesToRemove = [];
+  _.filter(matches, m => {
+    if (
+      m.homeTeamWinProbability < 50 &&
+      m.drawProbability < 50 &&
+      m.awayTeamWinProbability < 50
+    ) {
+      matchesToRemove.push(m);
+    }
+  });
+  const cleanMatches = _.difference(matches, matchesToRemove);
+  console.log(cleanMatches);
+  const csv = new otcsv(cleanMatches);
+  await csv.toDisk("./potentialBets.csv");
+}
+
+(async () => {
+  const foreBetPreds = await foreBet();
+  const kickOffPreds = await kickOff();
+  await findMatches(foreBetPreds, kickOffPreds);
+})();
